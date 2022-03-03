@@ -1,7 +1,10 @@
 package com.slopez.nosqldatastore.service
 
-import kotlinx.coroutines.*
-
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -14,43 +17,30 @@ internal class KotlinNoSqlDataStoreUnitTest {
     private val start: Int = 0
     private val stop: Int = -1
     private lateinit var dataStore: KotlinNoSqlDataStore
+    private lateinit var expireKeysJob: Job
+
 
     @BeforeEach
-    internal fun setUp() {
+    fun setUp() {
         dataStore = KotlinNoSqlDataStore()
 
-        assertDoesNotThrow {
-            runBlocking {
-                withTimeout(2000) {
-                    launch {
-                        dataStore.init()
-                    }
+        runBlocking {
+            withTimeout(500) {
+                expireKeysJob = launch {
+                    dataStore.init()
                 }
             }
         }
     }
 
+    @AfterEach
+    fun tearDown() {
+        expireKeysJob.cancel()
+    }
+
     @Test
     internal fun shouldSetValueAndReturnOK() {
         assertEquals("OK", dataStore.set(key, value))
-    }
-
-    @Test
-    internal fun shouldSetWithoutConcurrencyErrors() = runBlocking {
-        assertDoesNotThrow {
-            for (i in 0..10000) {
-                launch { dataStore.set(key, value+i) }
-            }
-        }
-    }
-
-    @Test
-    internal fun shouldSetExWithoutConcurrencyErrors() = runBlocking {
-        assertDoesNotThrow {
-            for (i in 0..10000) {
-                launch { dataStore.set(key, value+i, 1) }
-            }
-        }
     }
 
     @Test

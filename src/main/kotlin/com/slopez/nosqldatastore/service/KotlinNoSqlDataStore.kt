@@ -2,6 +2,7 @@ package com.slopez.nosqldatastore.service
 
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.concurrent.schedule
@@ -88,7 +89,7 @@ internal class KotlinNoSqlDataStore {
 
         if (null == storedSortedValues) {
             val sortedValues = ConcurrentHashMap<Int, MutableList<String>>()
-            sortedValues[score] = mutableListOf(member)
+            sortedValues[score] = Collections.synchronizedList(mutableListOf(member))
             sortedValuesHashMap[key] = sortedValues
 
             return 1
@@ -96,8 +97,12 @@ internal class KotlinNoSqlDataStore {
 
         var previousMemberWithDifferentScoreDeleted = false
         sortedValuesHashMap[key]!!.forEach { (score, scoreMembers) ->
-            if (scoreMembers.contains(member)) {
-                sortedValuesHashMap[key]!![score]!!.remove(member)
+            if (scoreMembers.contains(member) && null != sortedValuesHashMap[key]?.get(score)) {
+                sortedValuesHashMap[key]?.get(score)?.remove(member)
+                val currentScoreMembersSize = sortedValuesHashMap[key]?.count()
+                if (null == currentScoreMembersSize || 0 == currentScoreMembersSize) {
+                    sortedValuesHashMap.remove(key)
+                }
                 previousMemberWithDifferentScoreDeleted = true
                 return@forEach
             }
@@ -105,7 +110,7 @@ internal class KotlinNoSqlDataStore {
 
         var scoreValues = storedSortedValues[score]
         if (null == scoreValues) {
-            scoreValues = arrayListOf(member)
+            scoreValues = Collections.synchronizedList(mutableListOf(member))
             sortedValuesHashMap[key]!![score] = scoreValues
 
             if (previousMemberWithDifferentScoreDeleted) return 0
@@ -155,18 +160,21 @@ internal class KotlinNoSqlDataStore {
     internal fun zRange(key: String, start: Int, stop: Int): List<String> {
         assertKeyNotExistsInStringValuesHashMap(key)
 
-        val rangeOfElements = mutableListOf<String>()
+        val rangeOfElements = Collections.synchronizedList<String>(mutableListOf())
 
         val sortedValues = sortedValuesHashMap[key] ?: return rangeOfElements
 
-        sortedValues.forEach { (_, scoreValues) ->
-            var stopForThisIteration: Int = stop
-            val scoreValuesCount = scoreValues.count()
-            if (-1 == stop || scoreValuesCount <= stop) {
-                stopForThisIteration = scoreValuesCount - 1
-            }
 
-            rangeOfElements += scoreValues.slice(IntRange(start, stopForThisIteration))
+        sortedValues.forEach { (_, scoreValues) ->
+            synchronized(scoreValues) {
+                val scoreValuesCount = scoreValues.count()
+                var stopForThisIteration = scoreValuesCount - 1
+                if (-1 < stop && stop < scoreValuesCount) {
+                    stopForThisIteration = stop
+                }
+
+                rangeOfElements += scoreValues.slice(IntRange(start, stopForThisIteration))
+            }
         }
 
         return rangeOfElements
@@ -177,7 +185,7 @@ internal class KotlinNoSqlDataStore {
     private fun addKeyToExpireIndex(ex: Int, key: String) {
         val expireTimestamp = getNow()+ (ex * 1000)
         if (null == valuesExpireIndex[expireTimestamp]) {
-            valuesExpireIndex[expireTimestamp] = arrayListOf(key)
+            valuesExpireIndex[expireTimestamp] = Collections.synchronizedList(mutableListOf(key))
             return
         }
 
