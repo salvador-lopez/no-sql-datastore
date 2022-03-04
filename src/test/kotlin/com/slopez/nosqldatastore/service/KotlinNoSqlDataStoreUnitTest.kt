@@ -1,10 +1,6 @@
 package com.slopez.nosqldatastore.service
 
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withTimeout
-import org.junit.jupiter.api.AfterEach
+import kotlinx.coroutines.*
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -12,30 +8,26 @@ import org.junit.jupiter.api.assertThrows
 
 internal class KotlinNoSqlDataStoreUnitTest {
     private val key: String = "key"
+    private val sortedKey: String = "sortedKey"
     private val value: String = "value"
     private val score: Int = 1
     private val start: Int = 0
     private val stop: Int = -1
     private lateinit var dataStore: KotlinNoSqlDataStore
-    private lateinit var expireKeysJob: Job
+    private val threads = Runtime.getRuntime().availableProcessors()
 
 
     @BeforeEach
     fun setUp() {
         dataStore = KotlinNoSqlDataStore()
 
-        runBlocking {
-            withTimeout(500) {
-                expireKeysJob = launch {
+        assertDoesNotThrow {
+            runBlocking {
+                withContext(Dispatchers.Default) {
                     dataStore.init()
                 }
             }
         }
-    }
-
-    @AfterEach
-    fun tearDown() {
-        expireKeysJob.cancel()
     }
 
     @Test
@@ -234,7 +226,7 @@ internal class KotlinNoSqlDataStoreUnitTest {
     @Test
     internal fun shouldReturnAnEmptyArrayWhenCallToZRangeInAKeyThatIsNotSet() {
         val expectedResult = listOf<String>()
-        assertTrue(expectedResult == dataStore.zRange(key, start, stop))
+        assertEquals(expectedResult, dataStore.zRange(key, start, stop))
     }
 
     @Test
@@ -244,7 +236,7 @@ internal class KotlinNoSqlDataStoreUnitTest {
         dataStore.zAdd(key, 3, "three")
 
         val expectedResult = listOf("one", "two", "three")
-        assertTrue(expectedResult == dataStore.zRange(key, start, stop))
+        assertEquals(expectedResult, dataStore.zRange(key, start, stop))
     }
 
     @Test
@@ -256,7 +248,7 @@ internal class KotlinNoSqlDataStoreUnitTest {
 
         val stop = 1
         val expectedResult = listOf("one-one", "one-two", "two", "three")
-        assertTrue(expectedResult == dataStore.zRange(key, start, stop))
+        assertEquals(expectedResult, dataStore.zRange(key, start, stop))
     }
 
     @Test
@@ -264,7 +256,78 @@ internal class KotlinNoSqlDataStoreUnitTest {
         dataStore.zAdd(key, 1, "one")
 
         val expectedResult = listOf("one")
-        assertTrue(expectedResult == dataStore.zRange(key, start, start))
+        assertEquals(expectedResult, dataStore.zRange(key, start, start))
+    }
+
+    @Test
+    internal fun shouldReturnAllElementsOfTheSortedSetWhenCallToZRangeFromZeroToHigherPositionThanLastMember() {
+        dataStore.zAdd(key, 1, "one-one")
+        dataStore.zAdd(key, 1, "one-two")
+        dataStore.zAdd(key, 2, "two")
+        dataStore.zAdd(key, 3, "three")
+
+        val stop = 3
+        val expectedResult = listOf("one-one", "one-two", "two", "three")
+        assertEquals(expectedResult, dataStore.zRange(key, start, stop))
+    }
+
+    @Test
+    internal fun shouldReturnAllElementsOrderedFromLowestToHighestScore() {
+        dataStore.zAdd(key, 1, "aValue")
+        dataStore.zAdd(key, 0, "bValue")
+
+        val expectedResult = listOf("bValue", "aValue")
+        assertEquals(expectedResult,dataStore.zRange(key, start, stop))
+    }
+
+    @Test
+    internal fun shouldReturnAllElementsInLexicographicalOrderInsideTheSameScoreSet() {
+        dataStore.zAdd(key, 1, "aValue")
+        dataStore.zAdd(key, 0, "As")
+        dataStore.zAdd(key, 0, "Aster")
+        dataStore.zAdd(key, 0, "Baa")
+        dataStore.zAdd(key, 0, "Attack")
+        dataStore.zAdd(key, 0, "At")
+        dataStore.zAdd(key, 0, "Ataman")
+        dataStore.zAdd(key, 0, "Astrolabe")
+        dataStore.zAdd(key, 0, "Astrophysics")
+        dataStore.zAdd(key, 0, "Astronomy")
+
+        val expectedResult = listOf("As", "Aster", "Astrolabe", "Astronomy", "Astrophysics", "At", "Ataman", "Attack", "Baa", "aValue")
+        assertEquals(expectedResult,dataStore.zRange(key, start, stop))
+    }
+
+    @Test
+    internal fun shouldExecuteAllTheCallsThreadSafe() {
+        assertSafeDataStoreCallsMultiThreadedConcurrent(
+            listOf (
+                { dataStore.set(key, value + (1..10).random()) },
+                { dataStore.set(key, value, 1) },
+                { dataStore.del(key) },
+                { dataStore.zAdd(sortedKey, (0..10).random(), value+(0..10).random()) },
+                { dataStore.zCard(sortedKey) },
+                { dataStore.zRank(sortedKey, value) },
+                { dataStore.zRange(sortedKey, start, stop) }
+            )
+        )
+    }
+
+    private fun assertSafeDataStoreCallsMultiThreadedConcurrent(callables: List<()->Unit>) {
+        assertDoesNotThrow {
+            runBlocking {
+                for(i in 1..threads) {
+                    concurrentCallablesInvokeInANewThread(callables)
+                }
+            }
+        }
+    }
+
+    private suspend fun concurrentCallablesInvokeInANewThread(callables: List<()->Unit>) = withContext(Dispatchers.Default) {
+        repeat(10000){
+            callables.forEach {
+                launch { it.invoke() }
+            }
+        }
     }
 
     private fun assertOperationAgainstKeyHoldingWrongTypeOfValueExceptionMessage(exception: OperationAgainstKeyHoldingWrongTypeOfValueException) {

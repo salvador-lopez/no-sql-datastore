@@ -1,10 +1,12 @@
 package com.slopez.nosqldatastore.service
 
+import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.collections.HashMap
 import kotlin.concurrent.schedule
 
 internal class StringCannotBeRepresentedAsIntegerException(message: String) : Exception(message)
@@ -15,7 +17,7 @@ internal class OperationAgainstKeyHoldingWrongTypeOfValueException(
 internal class KotlinNoSqlDataStore {
     suspend fun init() {
         coroutineScope {
-            launch {
+           launch {
                 Timer(true).schedule(0, 500) {
                     val filteredExpireIndex = valuesExpireIndex.filter { (key) -> key <= getNow() }
                     filteredExpireIndex.forEach { keysToExpire ->
@@ -29,11 +31,11 @@ internal class KotlinNoSqlDataStore {
         }
     }
 
-    private val stringValuesHashMap: ConcurrentHashMap<String, String> = ConcurrentHashMap()
-    private val sortedValuesHashMap: ConcurrentHashMap<String, ConcurrentHashMap<Int, MutableList<String>>> = ConcurrentHashMap()
+    private val stringValuesHashMap: HashMap<String, String> = HashMap()
+    private val sortedValuesHashMap: HashMap<String, ConcurrentHashMap<Int, MutableList<String>>> = HashMap()
     private val valuesExpireIndex: ConcurrentHashMap<Int, MutableList<String>> = ConcurrentHashMap()
 
-    internal fun set(key: String, value: String) :String{
+    internal fun set(key: String, value: String) :String {
         stringValuesHashMap[key] = value
         sortedValuesHashMap.remove(key)
 
@@ -99,10 +101,6 @@ internal class KotlinNoSqlDataStore {
         sortedValuesHashMap[key]!!.forEach { (score, scoreMembers) ->
             if (scoreMembers.contains(member) && null != sortedValuesHashMap[key]?.get(score)) {
                 sortedValuesHashMap[key]?.get(score)?.remove(member)
-                val currentScoreMembersSize = sortedValuesHashMap[key]?.count()
-                if (null == currentScoreMembersSize || 0 == currentScoreMembersSize) {
-                    sortedValuesHashMap.remove(key)
-                }
                 previousMemberWithDifferentScoreDeleted = true
                 return@forEach
             }
@@ -119,6 +117,7 @@ internal class KotlinNoSqlDataStore {
         }
 
         scoreValues.add(member)
+        scoreValues.sort()
 
         return 1
     }
@@ -163,7 +162,6 @@ internal class KotlinNoSqlDataStore {
         val rangeOfElements = Collections.synchronizedList<String>(mutableListOf())
 
         val sortedValues = sortedValuesHashMap[key] ?: return rangeOfElements
-
 
         sortedValues.forEach { (_, scoreValues) ->
             synchronized(scoreValues) {

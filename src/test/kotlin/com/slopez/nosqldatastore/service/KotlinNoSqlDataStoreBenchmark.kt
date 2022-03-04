@@ -1,10 +1,7 @@
 package com.slopez.nosqldatastore.service
 
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withTimeout
-import org.junit.jupiter.api.AfterEach
+import kotlinx.coroutines.*
+import org.junit.jupiter.api.assertDoesNotThrow
 import org.openjdk.jmh.annotations.*
 import java.util.concurrent.TimeUnit
 
@@ -16,25 +13,14 @@ internal class KotlinNoSqlDataStoreBenchmark {
     private lateinit var key: String
     private lateinit var value: String
     private lateinit var dataStore: KotlinNoSqlDataStore
-    private lateinit var expireKeysJob: Job
 
     @Setup
     internal fun setUp() {
         key = "bench-key"
         value = "bench-value"
         dataStore = KotlinNoSqlDataStore()
-        runBlocking {
-            withTimeout(500) {
-                expireKeysJob = launch {
-                    dataStore.init()
-                }
-            }
-        }
-    }
 
-    @TearDown
-    internal fun tearDown() {
-        expireKeysJob.cancel()
+        assertDoesNotThrow { runBlocking { dataStore.init() } }
     }
 
     @Benchmark
@@ -56,6 +42,18 @@ internal class KotlinNoSqlDataStoreBenchmark {
     @Benchmark
     internal fun zAdd() {
         dataStore.zAdd(key, (0..10).random(), value)
+    }
+
+    @Benchmark
+    internal fun zCard() {
+        dataStore.zAdd(key, (0..10).random(), value)
+        dataStore.zCard(key)
+    }
+
+    @Benchmark
+    internal fun zRank() {
+        dataStore.zAdd(key, (0..10).random(), value)
+        dataStore.zRank(key, value)
     }
 
     @Benchmark
