@@ -38,8 +38,16 @@ internal class KotlinNoSqlDataStoreUnitTest {
     @Test
     internal fun shouldRemoveWhenExpires() {
         dataStore.set(key, value, 1)
-        Thread.sleep(1500)
-        assertNull(dataStore.get(key))
+
+        var valueAfterExpire: String? = value
+
+        val endTimeMillis = System.currentTimeMillis() + 2000
+        while (System.currentTimeMillis() <= endTimeMillis) {
+            valueAfterExpire = dataStore.get(key)
+            if (null == valueAfterExpire) break
+        }
+
+        assertNull(valueAfterExpire)
     }
 
     @Test
