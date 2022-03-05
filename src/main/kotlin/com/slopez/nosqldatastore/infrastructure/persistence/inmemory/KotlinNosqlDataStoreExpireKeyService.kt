@@ -1,4 +1,4 @@
-package com.slopez.nosqldatastore.service
+package com.slopez.nosqldatastore.infrastructure.persistence.inmemory
 
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch

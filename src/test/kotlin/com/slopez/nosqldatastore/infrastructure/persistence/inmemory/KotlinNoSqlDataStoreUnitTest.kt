@@ -1,5 +1,7 @@
-package com.slopez.nosqldatastore.service
+package com.slopez.nosqldatastore.infrastructure.persistence.inmemory
 
+import com.slopez.nosqldatastore.application.service.OperationAgainstKeyHoldingWrongTypeOfValueException
+import com.slopez.nosqldatastore.application.service.StringCannotBeRepresentedAsIntegerException
 import kotlinx.coroutines.*
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.*

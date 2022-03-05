@@ -1,53 +1,51 @@
-package com.slopez.nosqldatastore.service
+package com.slopez.nosqldatastore.infrastructure.persistence.inmemory
 
+import com.slopez.nosqldatastore.application.service.NoSqlDataStore
+import com.slopez.nosqldatastore.application.service.OperationAgainstKeyHoldingWrongTypeOfValueException
+import com.slopez.nosqldatastore.application.service.StringCannotBeRepresentedAsIntegerException
 import org.springframework.stereotype.Component
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.collections.HashMap
 
-internal class StringCannotBeRepresentedAsIntegerException(message: String) : Exception(message)
-internal class OperationAgainstKeyHoldingWrongTypeOfValueException(
-    override val message: String = "WRONGTYPE Operation against a key holding the wrong kind of value"
-) : Exception(message)
-
 @Component
-class KotlinNoSqlDataStore(val expireKeyService: KotlinNosqlDataStoreExpireKeyService) {
+class KotlinNoSqlDataStore(val expireKeyService: KotlinNosqlDataStoreExpireKeyService): NoSqlDataStore {
     companion object {
         internal var stringValuesHashMap: HashMap<String, String> = HashMap()
     }
 
     private val sortedValuesHashMap: HashMap<String, ConcurrentHashMap<Int, MutableList<String>>> = HashMap()
 
-    internal fun set(key: String, value: String) :String {
+    override fun set(key: String, value: String) :String {
         stringValuesHashMap[key] = value
         sortedValuesHashMap.remove(key)
 
         return "OK"
     }
 
-    internal fun set(key: String, value: String, ex: Int) :String {
+    override fun set(key: String, value: String, ex: Int) :String {
         expireKeyService.addKeyToExpireIndex(ex, key)
 
         return set(key, value)
     }
 
-    internal fun get(key: String): String? {
+    override fun get(key: String): String? {
         assertKeyNotExistsInSortedValuesHashMap(key)
 
         return stringValuesHashMap[key]
     }
 
-    internal fun del(key: String): Int {
+    override fun del(key: String): Int {
         if (null == stringValuesHashMap.remove(key) && null == sortedValuesHashMap.remove(key)) return 0
 
         return 1
     }
 
-    internal fun dbSize(): Int {
+    override fun dbSize(): Int {
         return stringValuesHashMap.count() + sortedValuesHashMap.count()
     }
 
-    internal fun incr(key: String): Int {
+    override fun incr(key: String): Int {
         val currentValue = get(key)
 
         if (null == currentValue) {
@@ -67,7 +65,7 @@ class KotlinNoSqlDataStore(val expireKeyService: KotlinNosqlDataStoreExpireKeySe
         return newValue
     }
 
-    internal fun zAdd(key: String, score: Int, member: String): Int {
+    override fun zAdd(key: String, score: Int, member: String): Int {
         assertKeyNotExistsInStringValuesHashMap(key)
 
         val storedSortedValues = sortedValuesHashMap[key]
@@ -105,7 +103,7 @@ class KotlinNoSqlDataStore(val expireKeyService: KotlinNosqlDataStoreExpireKeySe
         return 1
     }
 
-    internal fun zCard(key: String): Int {
+    override fun zCard(key: String): Int {
         assertKeyNotExistsInStringValuesHashMap(key)
 
         val storedValue = sortedValuesHashMap[key] ?: return 0
@@ -119,7 +117,7 @@ class KotlinNoSqlDataStore(val expireKeyService: KotlinNosqlDataStoreExpireKeySe
         return cardinality
     }
 
-    internal fun zRank(key: String, member: String): Int? {
+    override fun zRank(key: String, member: String): Int? {
         assertKeyNotExistsInStringValuesHashMap(key)
 
         val sortedValues = sortedValuesHashMap[key] ?: return null
@@ -139,7 +137,7 @@ class KotlinNoSqlDataStore(val expireKeyService: KotlinNosqlDataStoreExpireKeySe
         return null
     }
 
-    internal fun zRange(key: String, start: Int, stop: Int): List<String> {
+    override fun zRange(key: String, start: Int, stop: Int): List<String> {
         assertKeyNotExistsInStringValuesHashMap(key)
 
         val rangeOfElements = Collections.synchronizedList<String>(mutableListOf())

@@ -1,6 +1,5 @@
-package com.slopez.nosqldatastore
+package com.slopez.nosqldatastore.infrastructure.persistence.inmemory
 
-import com.slopez.nosqldatastore.service.KotlinNosqlDataStoreExpireKeyService
 import kotlinx.coroutines.runBlocking
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.CommandLineRunner
