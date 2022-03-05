@@ -1,37 +1,22 @@
 package com.slopez.nosqldatastore.service
 
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.launch
+import org.springframework.stereotype.Component
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.collections.HashMap
-import kotlin.concurrent.schedule
 
 internal class StringCannotBeRepresentedAsIntegerException(message: String) : Exception(message)
 internal class OperationAgainstKeyHoldingWrongTypeOfValueException(
     override val message: String = "WRONGTYPE Operation against a key holding the wrong kind of value"
 ) : Exception(message)
 
-internal class KotlinNoSqlDataStore {
-    suspend fun init() {
-        coroutineScope {
-           launch {
-                Timer(true).schedule(0, 500) {
-                    val filteredExpireIndex = valuesExpireIndex.filter { (key) -> key <= getNow() }
-                    filteredExpireIndex.forEach { keysToExpire ->
-                        keysToExpire.value.forEach { key ->
-                            del(key)
-                        }
-                        valuesExpireIndex.remove(keysToExpire.key)
-                    }
-                }
-            }
-        }
+@Component
+class KotlinNoSqlDataStore(val expireKeyService: KotlinNosqlDataStoreExpireKeyService) {
+    companion object {
+        internal var stringValuesHashMap: HashMap<String, String> = HashMap()
     }
 
-    private val stringValuesHashMap: HashMap<String, String> = HashMap()
     private val sortedValuesHashMap: HashMap<String, ConcurrentHashMap<Int, MutableList<String>>> = HashMap()
-    private val valuesExpireIndex: ConcurrentHashMap<Int, MutableList<String>> = ConcurrentHashMap()
 
     internal fun set(key: String, value: String) :String {
         stringValuesHashMap[key] = value
@@ -40,8 +25,8 @@ internal class KotlinNoSqlDataStore {
         return "OK"
     }
 
-    internal fun set(key: String, value: String, ex: Int) :String{
-        addKeyToExpireIndex(ex, key)
+    internal fun set(key: String, value: String, ex: Int) :String {
+        expireKeyService.addKeyToExpireIndex(ex, key)
 
         return set(key, value)
     }
@@ -174,18 +159,6 @@ internal class KotlinNoSqlDataStore {
         }
 
         return rangeOfElements
-    }
-
-    private fun getNow() = (System.currentTimeMillis()).toInt()
-
-    private fun addKeyToExpireIndex(ex: Int, key: String) {
-        val expireTimestamp = getNow()+ (ex * 1000)
-        if (null == valuesExpireIndex[expireTimestamp]) {
-            valuesExpireIndex[expireTimestamp] = Collections.synchronizedList(mutableListOf(key))
-            return
-        }
-
-        valuesExpireIndex[expireTimestamp]?.add(key)
     }
 
     private fun assertKeyNotExistsInSortedValuesHashMap(key: String) {

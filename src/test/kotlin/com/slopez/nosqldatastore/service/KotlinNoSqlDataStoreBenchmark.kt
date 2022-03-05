@@ -18,9 +18,21 @@ internal class KotlinNoSqlDataStoreBenchmark {
     internal fun setUp() {
         key = "bench-key"
         value = "bench-value"
-        dataStore = KotlinNoSqlDataStore()
 
-        assertDoesNotThrow { runBlocking { dataStore.init() } }
+        val expireKeyService = KotlinNosqlDataStoreExpireKeyService()
+        dataStore = KotlinNoSqlDataStore(expireKeyService)
+        assertDoesNotThrow {
+            runBlocking {
+                withContext(Dispatchers.Default) {
+                    expireKeyService.start()
+                }
+            }
+        }
+    }
+
+    @TearDown
+    internal fun tearDown() {
+        KotlinNoSqlDataStore.stringValuesHashMap = HashMap()
     }
 
     @Benchmark

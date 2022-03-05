@@ -1,6 +1,7 @@
 package com.slopez.nosqldatastore.service
 
 import kotlinx.coroutines.*
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -13,21 +14,26 @@ internal class KotlinNoSqlDataStoreUnitTest {
     private val score: Int = 1
     private val start: Int = 0
     private val stop: Int = -1
+    private lateinit var expireKeyService: KotlinNosqlDataStoreExpireKeyService
     private lateinit var dataStore: KotlinNoSqlDataStore
     private val threads = Runtime.getRuntime().availableProcessors()
 
-
     @BeforeEach
     fun setUp() {
-        dataStore = KotlinNoSqlDataStore()
-
+        expireKeyService = KotlinNosqlDataStoreExpireKeyService()
+        dataStore = KotlinNoSqlDataStore(expireKeyService)
         assertDoesNotThrow {
             runBlocking {
                 withContext(Dispatchers.Default) {
-                    dataStore.init()
+                    expireKeyService.start()
                 }
             }
         }
+    }
+
+    @AfterEach
+    fun tearDown() {
+        KotlinNoSqlDataStore.stringValuesHashMap = HashMap()
     }
 
     @Test
