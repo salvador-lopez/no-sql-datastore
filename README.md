@@ -27,7 +27,7 @@ You'll see that the REST api is exposed in localhost:8080
 ./gradlew benchmark
 ```
 
-If you use the intellij IDEA (intellij ultimate or only goland) you can execute all the gradle commands directly with the IDE
+If you use the intellij IDEA you can execute all the gradle commands directly with the IDE
 
 ## Frameworks and libraries used
 - [Spring boot](https://spring.io/)
@@ -68,6 +68,12 @@ inside the "test" folder
 - In a first iteration I solved the expiration of the keys using the [Timer.schedule](https://kotlinlang.org/api/latest/jvm/stdlib/kotlin.concurrent/java.util.-timer/schedule.html) approach
 but after running some benchmarks I realized that this approach is very slow as the Timer is adding the tasks to a queue and consuming them sequentially
 Because of this I decided to create an independent process that is checking every fixed amount of time if there is any key to expire.
+- Results of the benchmark with the current approach:
+
+![](src/test/resources/Benchmark%20results%20from%202022-03-06%2014-31-03.png "benchmark results")
+
+- As we can see in the benchmark results the setex operation is performing with +11M ops/sec and with the Timer.schedule approach was like 8K ops/sec
+
 
 - The KotlinNoSqlExpireKeyService is being executed by Spring Boot just after the application is correctly bootstraped using the CommandLineRunner "SetKeyExpirerServiceRunner"
 
