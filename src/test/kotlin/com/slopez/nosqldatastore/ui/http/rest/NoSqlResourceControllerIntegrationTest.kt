@@ -12,14 +12,14 @@ import org.springframework.test.web.servlet.put
 
 @SpringBootTest
 @AutoConfigureMockMvc
-internal class NoSqlResourceControllerTest(@Autowired var mockMvc: MockMvc) {
+internal class NoSqlResourceControllerIntegrationTest(@Autowired var mockMvc: MockMvc) {
     private val urlPath = "/mykey"
 
     @Test
     internal fun `PUT invalid value should return bad request`() {
         mockMvc.put(urlPath) {
-            contentType = MediaType.APPLICATION_FORM_URLENCODED
-            content = "value=inval/id"
+            contentType = MediaType.APPLICATION_JSON
+            content = "inval/id"
         }
             .andExpect {
                 status { isBadRequest() }
@@ -32,8 +32,8 @@ internal class NoSqlResourceControllerTest(@Autowired var mockMvc: MockMvc) {
     @Test
     internal fun `should PUT new value and return OK`() {
         mockMvc.put(urlPath) {
-            contentType = MediaType.APPLICATION_FORM_URLENCODED
-            content = "value=patata"
+            contentType = MediaType.APPLICATION_JSON
+            content = "patata"
         }
             .andExpect {
                 status { isOk() }
