@@ -211,6 +211,14 @@ internal class KotlinNoSqlDataStoreUnitTest {
     }
 
     @Test
+    internal fun shouldReturnZeroWhenCallToZRankAndTheMemberHaveNegativeScore() {
+        dataStore.zAdd(key, 1, "one")
+        dataStore.zAdd(key, -1, "two")
+        dataStore.zAdd(key, 27, "three")
+        assertEquals(0, dataStore.zRank(key, "two"))
+    }
+
+    @Test
     internal fun shouldReturnNullWhenCallToZRankAndTheKeyDoesNotExists() {
         assertNull(dataStore.zRank(key, value))
     }

@@ -122,16 +122,24 @@ class KotlinNoSqlDataStore(val expireKeyService: KotlinNosqlDataStoreExpireKeySe
 
         val sortedValues = sortedValuesHashMap[key] ?: return null
 
-        var memberScore : Int? = null
-        sortedValues.forEach { (score, scoreValues) ->
-            if (scoreValues.contains(member)) {
-                memberScore = score
-                return@forEach
+        var zrank = 0
+        var memberFound = false
+        run sortedValuesIt@ {
+            sortedValues.forEach { (_, scoreValues) ->
+
+                val scoreValuesCount = scoreValues.count()
+                val memberPosition = scoreValues.indexOf(member)
+                if (memberPosition != -1) {
+                    memberFound = true
+                    zrank += scoreValuesCount - memberPosition
+                    return@sortedValuesIt
+                }
+                zrank += scoreValuesCount
             }
         }
 
-        if (null != memberScore) {
-            return memberScore!! - 1
+        if (memberFound) {
+            return zrank - 1
         }
 
         return null
